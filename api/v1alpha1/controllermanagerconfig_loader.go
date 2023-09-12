@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 )
 
 func LoadOptionsFromFile(path string, scheme *runtime.Scheme, options *ctrl.Options, config *ControllerManagerConfig) error {
@@ -45,12 +46,17 @@ func addOptionsFromConfigSpec(o *ctrl.Options, configSpec ControllerManagerConfi
 		o.Cache.SyncPeriod = &configSpec.SyncPeriod.Duration
 	}
 
-	if len(o.Cache.Namespaces) == 0 && configSpec.CacheNamespace != "" {
-		o.Cache.Namespaces = []string{configSpec.CacheNamespace}
+	if len(o.Cache.DefaultNamespaces) == 0 && configSpec.CacheNamespace != "" {
+		// TODO: REFORMAT THIS THING!!!!!
+		namespaces := make(map[string]cache.Config, len(configSpec.CacheNamespace))
+		for _, ns := range configSpec.CacheNamespace {
+			namespaces[string(ns)] = cache.Config{}
+		}
+		o.Cache.DefaultNamespaces = namespaces
 	}
 
-	if o.MetricsBindAddress == "" && configSpec.Metrics.BindAddress != "" {
-		o.MetricsBindAddress = configSpec.Metrics.BindAddress
+	if o.Metrics.BindAddress == "" && configSpec.Metrics.BindAddress != "" {
+		o.Metrics.BindAddress = configSpec.Metrics.BindAddress
 	}
 
 	if o.HealthProbeBindAddress == "" && configSpec.Health.HealthProbeBindAddress != "" {
