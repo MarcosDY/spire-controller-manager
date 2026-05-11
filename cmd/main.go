@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"flag"
@@ -47,6 +48,7 @@ import (
 	k8sMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/jpillora/backoff"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	spirev1alpha1 "github.com/spiffe/spire-controller-manager/api/v1alpha1"
 	"github.com/spiffe/spire-controller-manager/internal/controller"
@@ -335,7 +337,7 @@ func run(mainConfig Config) (err error) {
 			BundleClient:  spireClient,
 		})
 
-		if err := webhookManager.Init(ctx); err != nil {
+		if err := initWithRetry(ctx, &backoff.Backoff{Min: time.Second, Max: 30 * time.Second}, webhookManager.Init); err != nil {
 			setupLog.Error(err, "failed to mint initial webhook certificate")
 			return err
 		}
@@ -600,6 +602,21 @@ func parseClusterDomainCNAME(cname string) (string, error) {
 	}
 
 	return clusterDomain, nil
+}
+
+func initWithRetry(ctx context.Context, b *backoff.Backoff, fn func(context.Context) error) error {
+	for {
+		if err := fn(ctx); err != nil {
+			setupLog.Info("webhook init failed, retrying", "error", err)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(b.Duration()):
+			}
+		} else {
+			return nil
+		}
+	}
 }
 
 func setLogger(opts *zap.Options, logLevel string, logEncoding string) error {

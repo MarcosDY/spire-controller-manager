@@ -9,3 +9,6 @@ webhook:
 leaderElection:
   leaderElect: true
   resourceName: 98c9c988.spiffe.io
+  leaseDuration: 60s
+  renewDeadline: 45s
+  retryPeriod: 5s
